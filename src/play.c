@@ -20,6 +20,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
+#include <unistd.h>
+#include <stdio.h>
 
 #include "mruby.h"
 #include "mruby/variable.h"
@@ -30,9 +32,13 @@
 #include "mruby/array.h"
 #include "mruby/numeric.h"
 
+#include "memory.h"
+
 // Struct holding data:
 typedef struct {
   double d;
+  int i;
+  double *ary;
 } play_data_s;
 
 // Garbage collector handler, for play_data struct
@@ -40,14 +46,18 @@ typedef struct {
 // Check it with GC.start
 static void play_data_destructor(mrb_state *mrb, void *p_) {
   play_data_s *pd = (play_data_s *)p_;
-  mrb_free(mrb, pd);
+  free(pd->ary);
+  free(pd);
+  // or simply:
+  // mrb_free(mrb, pd);
 };
 
 // Creating data type and reference for GC, in a const struct
 const struct mrb_data_type play_data_type = {"play_data", play_data_destructor};
 
 // Utility function for getting the struct out of the wrapping IV @data
-static void mrb_play_get_data(mrb_state *mrb, mrb_value self, play_data_s **data) {
+static void mrb_play_get_data(mrb_state *mrb, mrb_value self,
+                              play_data_s **data) {
   mrb_value data_value;
   data_value = mrb_iv_get(mrb, self, mrb_intern_lit(mrb, "@data"));
 
@@ -59,8 +69,8 @@ static void mrb_play_get_data(mrb_state *mrb, mrb_value self, play_data_s **data
 
 // Data Initializer C function (not exposed!)
 static void mrb_play_init(mrb_state *mrb, mrb_value self, double d) {
-  mrb_value data_value;     // this IV holds the data
-  play_data_s *p_data; // pointer to the C struct
+  mrb_value data_value; // this IV holds the data
+  play_data_s *p_data;  // pointer to the C struct
 
   data_value = mrb_iv_get(mrb, self, mrb_intern_lit(mrb, "@data"));
 
@@ -83,6 +93,9 @@ static void mrb_play_init(mrb_state *mrb, mrb_value self, double d) {
 
   // Now set values into struct:
   p_data->d = d;
+  p_data->i = 10;
+  p_data->ary = malloc(sizeof(double) * p_data->i);
+  memset(p_data->ary, 0, sizeof(double) * p_data->i);
 }
 
 static mrb_value mrb_play_initialize(mrb_state *mrb, mrb_value self) {
@@ -117,12 +130,75 @@ static mrb_value mrb_play_set_d(mrb_state *mrb, mrb_value self) {
   return d_value;
 }
 
+static mrb_value mrb_play_ary(mrb_state *mrb, mrb_value self) {
+  play_data_s *p_data = NULL;
+  mrb_value ary;
+  mrb_int i;
+  // call utility for unwrapping @data into p_data:
+  mrb_play_get_data(mrb, self, &p_data);
+
+  // Play with p_data content:
+  ary = mrb_ary_new_capa(mrb, p_data->i);
+  for (i = 0; i < p_data->i; i++) {
+    mrb_ary_set(mrb, ary, i, mrb_float_value(mrb, p_data->ary[i]));
+  }
+  return ary;
+}
+
+static mrb_value mrb_play_set_ary(mrb_state *mrb, mrb_value self) {
+  mrb_value ary_in = mrb_nil_value();
+  play_data_s *p_data = NULL;
+  mrb_int i;
+  mrb_value elem;
+  mrb_get_args(mrb, "o", &ary_in);
+
+  // call utility for unwrapping @data into p_data:
+  mrb_play_get_data(mrb, self, &p_data);
+  if (p_data->ary)
+    free(p_data->ary);
+  
+  p_data->i = RARRAY_LEN(ary_in);
+  p_data->ary = malloc(sizeof(double) * p_data->i);
+  for (i = 0; i < p_data->i; i++) {
+    elem = mrb_ary_entry(ary_in, i);
+    if (mrb_fixnum_p(elem) || mrb_float_p(elem))
+      p_data->ary[i] = mrb_to_flo(mrb, elem);
+    else {
+      p_data->i = 0;
+      p_data->ary = malloc(0);
+      mrb_raisef(mrb, E_RUNTIME_ERROR, "Non-numeric entry at position %S",
+                 mrb_fixnum_value(i));
+    }
+  }
+  return mrb_fixnum_value(i);
+}
+
+/* MEMORY INFO */
+static mrb_value mrb_process_getCurrentRSS(mrb_state *mrb, mrb_value self) {
+  return mrb_fixnum_value(getCurrentRSS());
+}
+
+static mrb_value mrb_process_getPeakRSS(mrb_state *mrb, mrb_value self) {
+  return mrb_fixnum_value(getPeakRSS());
+}
+
+
 void mrb_mruby_play_gem_init(mrb_state *mrb) {
-  struct RClass *play = mrb_define_class(mrb, "Play", mrb->object_class);
+  struct RClass *play, *process;
+  play = mrb_define_class(mrb, "Play", mrb->object_class);
   mrb_define_method(mrb, play, "initialize", mrb_play_initialize,
                     MRB_ARGS_NONE());
   mrb_define_method(mrb, play, "d", mrb_play_d, MRB_ARGS_NONE());
   mrb_define_method(mrb, play, "d=", mrb_play_set_d, MRB_ARGS_REQ(1));
+  mrb_define_method(mrb, play, "ary", mrb_play_ary, MRB_ARGS_NONE());
+  mrb_define_method(mrb, play, "ary=", mrb_play_set_ary, MRB_ARGS_REQ(1));
+  
+  process = mrb_define_module(mrb, "ProcessInfo");
+  mrb_const_set(mrb, mrb_obj_value(process), mrb_intern_lit(mrb, "PID"), mrb_fixnum_value(getpid()));
+  mrb_const_set(mrb, mrb_obj_value(process), mrb_intern_lit(mrb, "PPID"), mrb_fixnum_value(getppid()));
+  
+  mrb_define_class_method(mrb, process, "current_mem", mrb_process_getCurrentRSS, MRB_ARGS_NONE());
+  mrb_define_class_method(mrb, process, "peak_mem", mrb_process_getPeakRSS, MRB_ARGS_NONE());
 }
 
 void mrb_mruby_play_gem_final(mrb_state *mrb) {}
