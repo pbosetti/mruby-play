@@ -22,6 +22,7 @@
 #include <errno.h>
 #include <unistd.h>
 #include <stdio.h>
+#include <vector>
 
 #include "mruby.h"
 #include "mruby/variable.h"
@@ -32,12 +33,20 @@
 #include "mruby/array.h"
 #include "mruby/numeric.h"
 
+
+#include "test.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include "memory.h"
 
 // Struct holding data:
 typedef struct {
   double d;
   int i;
+  std::vector<int> first;
   double *ary;
 } play_data_s;
 
@@ -80,7 +89,7 @@ static void mrb_play_init(mrb_state *mrb, mrb_value self, double d) {
     free(p_data);
   }
   // Allocate and zero-out the data struct:
-  p_data = malloc(sizeof(play_data_s));
+  p_data = (play_data_s*)malloc(sizeof(play_data_s));
   memset(p_data, 0, sizeof(play_data_s));
   if (!p_data)
     mrb_raise(mrb, E_RUNTIME_ERROR, "Could not allocate @data");
@@ -94,7 +103,7 @@ static void mrb_play_init(mrb_state *mrb, mrb_value self, double d) {
   // Now set values into struct:
   p_data->d = d;
   p_data->i = 10;
-  p_data->ary = malloc(sizeof(double) * p_data->i);
+  p_data->ary = (double*)malloc(sizeof(double) * p_data->i);
   memset(p_data->ary, 0, sizeof(double) * p_data->i);
 }
 
@@ -150,7 +159,7 @@ static mrb_value mrb_play_set_ary(mrb_state *mrb, mrb_value self) {
   play_data_s *p_data = NULL;
   mrb_int i;
   mrb_value elem;
-  mrb_get_args(mrb, "o", &ary_in);
+  mrb_get_args(mrb, "A", &ary_in);
 
   // call utility for unwrapping @data into p_data:
   mrb_play_get_data(mrb, self, &p_data);
@@ -158,14 +167,14 @@ static mrb_value mrb_play_set_ary(mrb_state *mrb, mrb_value self) {
     free(p_data->ary);
   
   p_data->i = RARRAY_LEN(ary_in);
-  p_data->ary = malloc(sizeof(double) * p_data->i);
+  p_data->ary = (double*)malloc(sizeof(double) * p_data->i);
   for (i = 0; i < p_data->i; i++) {
     elem = mrb_ary_entry(ary_in, i);
     if (mrb_fixnum_p(elem) || mrb_float_p(elem))
       p_data->ary[i] = mrb_to_flo(mrb, elem);
     else {
       p_data->i = 0;
-      p_data->ary = malloc(0);
+      p_data->ary = (double*)malloc(0);
       mrb_raisef(mrb, E_RUNTIME_ERROR, "Non-numeric entry at position %S",
                  mrb_fixnum_value(i));
     }
@@ -182,10 +191,20 @@ static mrb_value mrb_process_getPeakRSS(mrb_state *mrb, mrb_value self) {
   return mrb_fixnum_value(getPeakRSS());
 }
 
+static mrb_value mrb_play_check(mrb_state *mrb, mrb_value self) {
+  int *x_p, *y_p, x, y;
+  x_p = &x; y_p = &y;
+  mrb_int i;
+  mrb_get_args(mrb, "i", &i);
+  check(i, x_p, y_p);
+  return mrb_fixnum_value(x);
+}
 
 void mrb_mruby_play_gem_init(mrb_state *mrb) {
   struct RClass *play, *process;
   play = mrb_define_class(mrb, "Play", mrb->object_class);
+  mrb_define_method(mrb, play, "check", mrb_play_check,
+                    MRB_ARGS_NONE());
   mrb_define_method(mrb, play, "initialize", mrb_play_initialize,
                     MRB_ARGS_NONE());
   mrb_define_method(mrb, play, "d", mrb_play_d, MRB_ARGS_NONE());
@@ -202,3 +221,8 @@ void mrb_mruby_play_gem_init(mrb_state *mrb) {
 }
 
 void mrb_mruby_play_gem_final(mrb_state *mrb) {}
+
+
+#ifdef __cplusplus
+} //extern "C" {
+#endif
