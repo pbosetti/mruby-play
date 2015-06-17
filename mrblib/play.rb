@@ -17,5 +17,9 @@
 #                                                                         #
 #*************************************************************************#
 
+class SleepError < Exception
+  attr_reader :actual
+end
+
 class Play
 end

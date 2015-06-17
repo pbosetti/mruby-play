@@ -6,7 +6,8 @@ if __FILE__ == $PROGRAM_NAME
   unless File.exists?('tmp/mruby')
     system 'git clone --depth 1 https://github.com/mruby/mruby.git tmp/mruby'
   end
-  exit system(%Q[cd tmp/mruby; MRUBY_CONFIG=#{File.expand_path __FILE__} ./minirake #{ARGV.join(' ')}])
+  system(%Q[cd tmp/mruby; MRUBY_CONFIG=#{File.expand_path __FILE__} ./minirake #{ARGV.join(' ')}])
+  exit system %Q"ln -s tmp/mruby/bin/mirb ."
 end
 
 MRuby::Build.new do |conf|
