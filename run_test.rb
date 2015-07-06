@@ -12,7 +12,8 @@ end
 
 MRuby::Build.new do |conf|
   toolchain :gcc
+  conf.cc.flags += %w(-fexceptions -Wno-deprecated-declarations)
+  conf.cc.defines += %w(ENABLE_READLINE)
   conf.gembox 'default'
   conf.gem File.dirname(__FILE__)
-  conf.cc.defines = %w(ENABLE_READLINE)
 end

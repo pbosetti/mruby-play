@@ -1,8 +1,8 @@
 #*************************************************************************#
 #                                                                         #
 # raspberry.rb - mruby gem provoding access to Raspberry Pi IOs           #
-# Copyright (C) 2015 Paolo Bosetti and Matteo Ragni,                      #
-# paolo[dot]bosetti[at]unitn.it and matteo[dot]ragni[at]unitn.it          #
+# Copyright (C) 2015 Paolo Bosetti                                        #
+# paolo[dot]bosetti[at]unitn.it                                           #
 # Department of Industrial Engineering, University of Trento              #
 #                                                                         #
 # This library is free software.  You can redistribute it and/or          #
@@ -17,9 +17,6 @@
 #                                                                         #
 #*************************************************************************#
 
-class SleepError < Exception
-  attr_reader :actual
-end
-
 class Play
+
 end

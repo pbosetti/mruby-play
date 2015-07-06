@@ -35,6 +35,7 @@
 #include "mruby/value.h"
 #include "mruby/array.h"
 #include "mruby/numeric.h"
+#include "mruby/compile.h"
 
 #include "test.h"
 
@@ -229,13 +230,13 @@ static mrb_value mrb_kernel_sleep(mrb_state *mrb, mrb_value self) {
   if (0 != nanosleep(&ts, &rts)) {
     double actual = rts.tv_sec + rts.tv_nsec / (double)1e9;
     mrb_value actual_v = mrb_float_value(mrb, actual);
-    char buf[256];
-    snprintf(buf, sizeof(buf),
-             "Sleep interrupted (errno: '%s'). Slept for %f s", strerror(errno),
-             actual);
+    char *buf = NULL;
+    asprintf(&buf, "Sleep interrupted (errno: '%s'). Slept for %f s",
+             strerror(errno), actual);
     mrb_value exc =
         mrb_exc_new(mrb, mrb_class_get(mrb, "SleepError"), buf, strlen(buf));
     mrb_iv_set(mrb, exc, mrb_intern_lit(mrb, "@actual"), actual_v);
+    free(buf);
     mrb_exc_raise(mrb, exc);
   }
   return mrb_float_value(mrb, 0);
@@ -247,6 +248,8 @@ void mrb_mruby_play_gem_init(mrb_state *mrb) {
                     MRB_ARGS_OPT(2));
   mrb_define_method(mrb, mrb->kernel_module, "sleep", mrb_kernel_sleep,
                     MRB_ARGS_REQ(1));
+  mrb_load_string(mrb,
+                  "class SleepError < Exception; attr_reader :actual; end");
 
   play = mrb_define_class(mrb, "Play", mrb->object_class);
   mrb_define_method(mrb, play, "check", mrb_play_check, MRB_ARGS_NONE());
