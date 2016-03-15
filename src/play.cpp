@@ -34,10 +34,12 @@
 #include "mruby/class.h"
 #include "mruby/value.h"
 #include "mruby/array.h"
+#include "mruby/hash.h"
 #include "mruby/numeric.h"
 #include "mruby/compile.h"
 
 #include "test.h"
+#include "simple.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -242,12 +244,70 @@ static mrb_value mrb_kernel_sleep(mrb_state *mrb, mrb_value self) {
   return mrb_float_value(mrb, 0);
 }
 
+ 
+static mrb_value mrb_kernel_test(mrb_state *mrb, mrb_value self) {
+  // ruby arguments: symbol for independent var, value od independent var
+  mrb_sym _var_name;
+  mrb_float var_value;
+  const char * var_name;
+    
+  mrb_get_args(mrb, "nf", &_var_name, &var_value);
+  var_name = mrb_sym2name(mrb, _var_name);
+  // verifica (da rimuovere):
+  printf("name: %s, value: %f\n", var_name, (double)var_value);
+  // ora bisogna valutare le spline per la variabile indipendente in var_name
+  // per il valore in var_value. Il risultato (un GC) va trasformato in hash 
+  // e restituito.
+  
+  // return values
+  mrb_value res = mrb_hash_new(mrb) ;
+  // riempire res con il GC
+  
+  return res;
+}
+
+
+
+
+// typedef struct {
+//   int i;
+//   float f;
+// } simple_context;
+//
+// static void simple_free(mrb_state *mrb, void *p) {
+//   if (p != NULL) {
+//     free(p);
+//   }
+// }
+//
+// static struct mrb_data_type mrb_simple_ctx_type = {"SimpleContext",
+//                                                       simple_free};
+//
+// mrb_value mrb_simple_init(mrb_state *mrb, mrb_value self) {
+//   mrb_int val_i;
+//   mrb_value val_f;
+//   simple_context *simple;
+//   simple = calloc(1, sizeof(simple));
+//
+//   mrb_get_args(mrb, "if", &val_i, &val_f);
+//   simple->i = (int)val_i;
+//
+//   DATA_TYPE(self) = &mrb_simple_ctx_type;
+//   DATA_PTR(self) = simple;
+//   return self;
+// }
+
+
+
+
 void mrb_mruby_play_gem_init(mrb_state *mrb) {
-  struct RClass *play, *process;
+  struct RClass *play, *process, *simple;
   mrb_define_method(mrb, mrb->kernel_module, "daemon", mrb_kernel_daemon,
                     MRB_ARGS_OPT(2));
   mrb_define_method(mrb, mrb->kernel_module, "sleep", mrb_kernel_sleep,
                     MRB_ARGS_REQ(1));
+  mrb_define_method(mrb, mrb->kernel_module, "test", mrb_kernel_test,
+                                      MRB_ARGS_REQ(2));
   mrb_load_string(mrb,
                   "class SleepError < Exception; attr_reader :actual; end");
 
@@ -273,9 +333,23 @@ void mrb_mruby_play_gem_init(mrb_state *mrb) {
                           mrb_process_getCurrentRSS, MRB_ARGS_NONE());
   mrb_define_class_method(mrb, process, "peak_mem", mrb_process_getPeakRSS,
                           MRB_ARGS_NONE());
+
+  simple = mrb_define_class(mrb, "Simple", mrb->object_class);
+  MRB_SET_INSTANCE_TT(simple, MRB_TT_DATA);
+  mrb_define_method(mrb, simple, "f", mrb_simple_f, MRB_ARGS_NONE());
+  mrb_define_method(mrb, simple, "i", mrb_simple_i, MRB_ARGS_NONE());
+  mrb_define_method(mrb, simple, "initialize", mrb_simple_init,
+                    MRB_ARGS_REQ(2));
+
 }
 
 void mrb_mruby_play_gem_final(mrb_state *mrb) {}
+
+
+
+
+
+
 
 #ifdef __cplusplus
 } // extern "C" {
