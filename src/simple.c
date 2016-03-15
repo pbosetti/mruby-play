@@ -36,21 +36,20 @@ mrb_value mrb_simple_init(mrb_state *mrb, mrb_value self) {
   simple->i = (int)val_i;  
   simple->f = val_f;
 
-  DATA_TYPE(self) = &mrb_simple_ctx_type;
-  DATA_PTR(self) = simple;
+  mrb_data_init(self, simple, &mrb_simple_ctx_type);
   return self;
 }
 
 mrb_value mrb_simple_f(mrb_state *mrb, mrb_value self) {
   simple_context *simple;
-  Data_Get_Struct(mrb, self, &mrb_simple_ctx_type, simple);
+  simple = DATA_GET_PTR(mrb, self, &mrb_simple_ctx_type, simple_context);
   
   return mrb_float_value(mrb, simple->f);
 }
 
 mrb_value mrb_simple_i(mrb_state *mrb, mrb_value self) {
   simple_context *simple;
-  Data_Get_Struct(mrb, self, &mrb_simple_ctx_type, simple);
+  simple = DATA_GET_PTR(mrb, self, &mrb_simple_ctx_type, simple_context);
   
   return mrb_fixnum_value(simple->i);
 }
